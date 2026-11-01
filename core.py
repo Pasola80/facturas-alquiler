@@ -5,6 +5,7 @@ import json
 import smtplib
 import ssl
 import sys
+import tempfile
 import unicodedata
 import urllib.error
 import urllib.request
@@ -484,6 +485,76 @@ class EnvioGraph:
         datos = base64.b64encode(msg.as_bytes())
         self._post(GRAPH_ENVIAR, {"Authorization": f"Bearer {self._token()}",
                                   "Content-Type": "text/plain"}, datos)
+
+    def quit(self):
+        pass
+
+
+# ------------------------------------------------------------- Outlook de escritorio
+def usa_outlook(cfg):
+    return str(cfg.get("metodo_envio", "")).strip().lower() == "outlook"
+
+
+class EnvioOutlook:
+    """Envía con el Outlook clásico instalado en el ordenador (ya tiene la sesión iniciada).
+
+    Misma interfaz mínima que smtplib.SMTP (send_message, quit)."""
+
+    def __init__(self, cfg, aplicacion=None):
+        self.cuenta = str(cfg.get("cuenta_outlook", "")).strip()
+        self._app = aplicacion
+
+    def abrir(self):
+        """Conecta con Outlook (lo abre si está cerrado) y localiza la cuenta de envío."""
+        try:
+            if self._app is None:
+                import win32com.client
+                self._app = win32com.client.Dispatch("Outlook.Application")
+            self._cuenta_envio = self._buscar_cuenta()
+        except ErrorEnvio:
+            raise
+        except Exception as e:
+            raise ErrorEnvio(
+                "No se pudo abrir Outlook.\n\nComprueba que tienes instalado el Outlook clásico "
+                "(el de Office, con el icono azul) y que has entrado en él al menos una vez con tu cuenta."
+                f"\n\nDetalle: {e}")
+
+    def _buscar_cuenta(self):
+        cuentas = list(self._app.Session.Accounts)
+        direcciones = [str(getattr(c, "SmtpAddress", "")) for c in cuentas]
+        if not self.cuenta:
+            return None
+        for c, d in zip(cuentas, direcciones):
+            if d.lower() == self.cuenta.lower():
+                return c
+        raise ErrorEnvio(
+            f"En Outlook no hay ninguna cuenta con la dirección {self.cuenta}.\n\n"
+            "Cuentas que tiene Outlook: " + (", ".join(direcciones) or "ninguna") +
+            "\n\nCorrige «cuenta_outlook» en Ajustes para que coincida con una de ellas.")
+
+    def send_message(self, msg):
+        if self._app is None:
+            self.abrir()
+        try:
+            item = self._app.CreateItem(0)  # 0 = correo
+            item.To = "; ".join(a.strip() for a in str(msg["To"]).split(",") if a.strip())
+            if msg["Cc"]:
+                item.CC = "; ".join(a.strip() for a in str(msg["Cc"]).split(",") if a.strip())
+            item.Subject = str(msg["Subject"])
+            cuerpo = msg.get_body(preferencelist=("plain",))
+            item.Body = cuerpo.get_content() if cuerpo is not None else ""
+            if self._cuenta_envio is not None:
+                item.SendUsingAccount = self._cuenta_envio
+            carpeta = Path(tempfile.mkdtemp())
+            for adj in msg.iter_attachments():
+                ruta = carpeta / adj.get_filename()
+                ruta.write_bytes(adj.get_payload(decode=True))
+                item.Attachments.Add(str(ruta))
+            item.Send()
+        except ErrorEnvio:
+            raise
+        except Exception as e:
+            raise ErrorEnvio(f"Outlook no pudo enviar el correo.\n\nDetalle: {e}")
 
     def quit(self):
         pass

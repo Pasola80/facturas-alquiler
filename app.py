@@ -254,6 +254,17 @@ class App(tk.Tk):
         if not cuenta:
             return None
         cfg = self.cfg()
+        if core.usa_outlook(cfg):
+            srv = core.EnvioOutlook(cfg)
+            self.log("Conectando con Outlook…")
+            self.update()
+            try:
+                srv.abrir()
+            except core.ErrorEnvio as e:
+                self.log("No se pudo abrir Outlook.")
+                messagebox.showerror("No se pudo enviar", str(e))
+                return None
+            return srv
         if core.usa_graph(cfg):
             return self.iniciar_sesion_microsoft(cfg)
         clave, recordar = self.pedir_clave(cuenta)

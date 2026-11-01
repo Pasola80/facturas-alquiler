@@ -2,6 +2,7 @@
   "cuenta_outlook": "",
   "remitente_nombre": "Nombre",
   "firma_correo": "Nombre",
+  "metodo_envio": "outlook",
   "smtp_servidor": "smtp-mail.outlook.com",
   "smtp_puerto": 587,
   "microsoft_client_id": "",

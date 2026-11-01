@@ -70,4 +70,37 @@ assert capturado["url"].endswith("/me/sendMail") and capturado["cab"]["Content-T
 assert capturado["cab"]["Authorization"] == "Bearer TOKEN"
 assert base64.b64decode(capturado["datos"]) == msg_prueba.as_bytes()
 
+# Envío por Outlook de escritorio (con un Outlook simulado)
+class _Adj:
+    def __init__(self): self.rutas = []
+    def Add(self, r):
+        from pathlib import Path as P
+        assert P(r).read_bytes()[:4] == b"%PDF"
+        self.rutas.append(r)
+class _Item:
+    def __init__(self): self.Attachments = _Adj(); self.CC = ""
+    def Send(self): self.enviado = True
+class _Cuenta:
+    def __init__(self, d): self.SmtpAddress = d
+class _App:
+    def __init__(self): self.items = []; self.Session = type("S", (), {"Accounts": [_Cuenta("otra@x.com"), _Cuenta("Prueba@Outlook.com")]})()
+    def CreateItem(self, n):
+        assert n == 0
+        it = _Item(); self.items.append(it); return it
+cfg_o = dict(cfg, metodo_envio="outlook")
+assert core.usa_outlook(cfg_o) and not core.usa_outlook(dict(cfg, metodo_envio="smtp"))
+app = _App()
+env = core.EnvioOutlook(cfg_o, aplicacion=app)
+env.abrir()
+for inv, tipo, msg in pend[:2]:
+    env.send_message(msg)
+assert len(app.items) == 2 and all(i.enviado and len(i.Attachments.rutas) == 1 for i in app.items)
+assert app.items[0].SendUsingAccount.SmtpAddress == "Prueba@Outlook.com"
+assert app.items[0].To and app.items[0].Subject and "Un saludo" in app.items[0].Body
+try:
+    core.EnvioOutlook(dict(cfg_o, cuenta_outlook="nadie@x.com"), aplicacion=_App()).abrir()
+    raise SystemExit("debería fallar con una cuenta inexistente")
+except core.ErrorEnvio:
+    pass
+
 print("todas las comprobaciones correctas")
