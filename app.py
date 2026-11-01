@@ -249,16 +249,19 @@ class App(tk.Tk):
         return res["v"], bool(res["v"]) and rec.get()
 
     def iniciar_sesion(self):
-        """Devuelve (servidor, cuenta) o None si se cancela o falla."""
+        """Devuelve el servidor de envío o None si se cancela o falla."""
         cuenta = self.asegurar_cuenta()
         if not cuenta:
             return None
+        cfg = self.cfg()
+        if core.usa_graph(cfg):
+            return self.iniciar_sesion_microsoft(cfg)
         clave, recordar = self.pedir_clave(cuenta)
         if not clave:
             return None
         self.log("Conectando con Outlook…")
         try:
-            srv = core.conectar(self.cfg(), clave)
+            srv = core.conectar(cfg, clave)
         except core.ErrorEnvio as e:
             core.borrar_clave(cuenta)
             self.log("No se pudo iniciar sesión.")
@@ -266,6 +269,25 @@ class App(tk.Tk):
             return None
         if recordar:
             core.guardar_clave(cuenta, clave)
+        return srv
+
+    def iniciar_sesion_microsoft(self, cfg):
+        srv = core.EnvioGraph(cfg)
+        if not srv.sesion_iniciada():
+            messagebox.showinfo(
+                "Iniciar sesión en Microsoft",
+                "Ahora se abrirá el navegador con la página de Microsoft.\n\n"
+                "Inicia sesión con tu cuenta de Outlook y pulsa «Sí» o «Aceptar» cuando te pida permiso "
+                "para enviar correos.\n\nSolo hace falta la primera vez.")
+            self.log("Esperando el inicio de sesión en el navegador…")
+            self.update()
+            try:
+                srv.iniciar_sesion()
+            except core.ErrorEnvio as e:
+                self.log("No se pudo iniciar sesión.")
+                messagebox.showerror("No se pudo enviar", str(e))
+                return None
+        self.log("Sesión de Microsoft lista.")
         return srv
 
     # -------------------------------------------------------------------- enviar
@@ -375,11 +397,13 @@ class App(tk.Tk):
         def olvidar():
             cuenta = self.cfg().get("cuenta_outlook", "")
             core.borrar_clave(cuenta)
-            messagebox.showinfo("Hecho", "La contraseña guardada se ha borrado de este ordenador.", parent=d)
+            if core.usa_graph(self.cfg()):
+                core.EnvioGraph(self.cfg()).olvidar()
+            messagebox.showinfo("Hecho", "La sesión y la contraseña guardadas se han borrado de este ordenador.", parent=d)
 
         tk.Button(d, text="Editar arrendatarios, importes y correos", font=F_NORMAL, bg=GRIS, relief="flat",
                   padx=14, pady=8, command=editar).pack(pady=6)
-        tk.Button(d, text="Olvidar la contraseña guardada", font=F_NORMAL, bg=GRIS, relief="flat",
+        tk.Button(d, text="Cerrar la sesión guardada", font=F_NORMAL, bg=GRIS, relief="flat",
                   padx=14, pady=8, command=olvidar).pack(pady=6)
         tk.Button(d, text="Cerrar", font=F_NORMAL, bg=GRIS, relief="flat", padx=14, pady=8,
                   command=d.destroy).pack(pady=14)

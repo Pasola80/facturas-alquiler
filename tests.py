@@ -56,4 +56,18 @@ for inv, tipo, _ in pend:
     core.marcar_enviado(2026, 11, inv["id"], tipo)
 assert core.correos_pendientes(cfg, 2026, 11)[1] == []
 
+# Envío por Microsoft Graph (sin red): el cuerpo es el MIME completo en base64
+import base64
+cfg_g = dict(cfg, microsoft_client_id="00000000-0000-0000-0000-000000000000")
+assert core.usa_graph(cfg_g) and not core.usa_graph(cfg)
+envio = core.EnvioGraph(cfg_g, ruta_cache=tmp / "sesion.json")
+capturado = {}
+envio._token = lambda: "TOKEN"
+envio._post = lambda url, cab, datos: capturado.update(url=url, cab=cab, datos=datos)
+msg_prueba = core.mensaje_de_prueba(cfg)
+envio.send_message(msg_prueba)
+assert capturado["url"].endswith("/me/sendMail") and capturado["cab"]["Content-Type"] == "text/plain"
+assert capturado["cab"]["Authorization"] == "Bearer TOKEN"
+assert base64.b64decode(capturado["datos"]) == msg_prueba.as_bytes()
+
 print("todas las comprobaciones correctas")

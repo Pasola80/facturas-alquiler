@@ -4,6 +4,7 @@
   "firma_correo": "Nombre",
   "smtp_servidor": "smtp-mail.outlook.com",
   "smtp_puerto": 587,
+  "microsoft_client_id": "",
   "iva": 21,
   "irpf": 19,
   "dia_emision": 1,

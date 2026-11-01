@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """Lógica del programa de facturas de alquiler (PDF, correos, envío). Sin interfaz."""
+import base64
 import json
 import smtplib
 import ssl
 import sys
 import unicodedata
+import urllib.error
+import urllib.request
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from email.message import EmailMessage
@@ -385,6 +388,105 @@ def conectar(cfg, clave):
             f"tipo de acceso en la cuenta.\n\nDetalle: {e}")
     except (smtplib.SMTPException, OSError) as e:
         raise ErrorEnvio(f"No se pudo conectar con el servidor de correo.\n\nDetalle: {e}")
+
+
+# ---------------------------------------------------------------- Microsoft Graph
+GRAPH_ENVIAR = "https://graph.microsoft.com/v1.0/me/sendMail"
+GRAPH_AUTORIDAD = "https://login.microsoftonline.com/consumers"
+GRAPH_PERMISOS = ["Mail.Send"]
+
+
+def usa_graph(cfg):
+    return bool(str(cfg.get("microsoft_client_id", "")).strip())
+
+
+class EnvioGraph:
+    """Envía correos con la cuenta Microsoft (inicio de sesión normal, sin contraseñas de aplicación).
+
+    Tiene la misma interfaz mínima que smtplib.SMTP (send_message, quit)."""
+
+    def __init__(self, cfg, ruta_cache=None):
+        self.client_id = str(cfg["microsoft_client_id"]).strip()
+        self.ruta_cache = Path(ruta_cache) if ruta_cache else BASE / "sesion_microsoft.json"
+        self._app = None
+        self._cache = None
+
+    def _msal(self):
+        if self._app is None:
+            import msal
+            self._cache = msal.SerializableTokenCache()
+            if self.ruta_cache.exists():
+                try:
+                    self._cache.deserialize(self.ruta_cache.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            self._app = msal.PublicClientApplication(
+                self.client_id, authority=GRAPH_AUTORIDAD, token_cache=self._cache)
+        return self._app
+
+    def _guardar_cache(self):
+        if self._cache is not None and self._cache.has_state_changed:
+            self.ruta_cache.write_text(self._cache.serialize(), encoding="utf-8")
+
+    def _silencioso(self):
+        app = self._msal()
+        for cuenta in app.get_accounts():
+            r = app.acquire_token_silent(GRAPH_PERMISOS, account=cuenta)
+            if r and "access_token" in r:
+                self._guardar_cache()
+                return r
+        return None
+
+    def sesion_iniciada(self):
+        try:
+            return self._silencioso() is not None
+        except Exception:
+            return False
+
+    def iniciar_sesion(self):
+        """Abre el navegador para que la persona inicie sesión en Microsoft (solo la primera vez)."""
+        try:
+            if self._silencioso():
+                return
+            r = self._msal().acquire_token_interactive(
+                GRAPH_PERMISOS, prompt="select_account", timeout=300)
+        except Exception as e:
+            raise ErrorEnvio(f"No se pudo iniciar sesión en Microsoft.\n\nDetalle: {e}")
+        if not r or "access_token" not in r:
+            detalle = (r or {}).get("error_description") or (r or {}).get("error") or "sin respuesta"
+            raise ErrorEnvio(f"Microsoft no ha completado el inicio de sesión.\n\nDetalle: {detalle}")
+        self._guardar_cache()
+
+    def olvidar(self):
+        try:
+            self.ruta_cache.unlink()
+        except OSError:
+            pass
+
+    def _token(self):
+        r = self._silencioso()
+        if not r:
+            raise ErrorEnvio("La sesión con Microsoft ha caducado. Vuelve a intentarlo para iniciar sesión.")
+        return r["access_token"]
+
+    def _post(self, url, cabeceras, datos):
+        req = urllib.request.Request(url, data=datos, headers=cabeceras, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return resp.status
+        except urllib.error.HTTPError as e:
+            cuerpo = e.read().decode("utf-8", "replace")[:500]
+            raise ErrorEnvio(f"Microsoft rechazó el envío (código {e.code}).\n\nDetalle: {cuerpo}")
+        except OSError as e:
+            raise ErrorEnvio(f"No se pudo conectar con Microsoft.\n\nDetalle: {e}")
+
+    def send_message(self, msg):
+        datos = base64.b64encode(msg.as_bytes())
+        self._post(GRAPH_ENVIAR, {"Authorization": f"Bearer {self._token()}",
+                                  "Content-Type": "text/plain"}, datos)
+
+    def quit(self):
+        pass
 
 
 def mensaje_de_prueba(cfg):
