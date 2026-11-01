@@ -8,7 +8,7 @@ import core
 tmp = Path(tempfile.mkdtemp())
 core.SALIDA = tmp / "facturas"
 core.RUTA_ESTADO = tmp / "estado.json"
-core.guardar_json(core.RUTA_ESTADO, {"ultima_tanda": {"2026": 10}})
+core.guardar_json(core.RUTA_ESTADO, {"base_tanda": {"2026": 10}})
 cfg = core.cargar_config(core.BASE / "config.ejemplo.json")
 cfg["cuenta_outlook"] = "prueba@outlook.com"
 
@@ -32,6 +32,14 @@ for inv in tanda["facturas"]:
     pdf = core.carpeta_mes(2026, 11) / inv["pdf"]
     assert pdf.exists() and pdf.stat().st_size > 1500, pdf
 assert core.tanda_sugerida(2026) == 12
+# Repetir 'preparar' o borrar la carpeta y rehacerla no cambia el número
+core.preparar_tanda(cfg, 2026, 11, 99, {f["id"]: f["base"] for f in filas})
+assert core.cargar_tanda(2026, 11)["numero"] == "2026/L11"
+import shutil
+shutil.rmtree(core.carpeta_mes(2026, 11))
+assert core.tanda_sugerida(2026) == 11
+tanda = core.preparar_tanda(cfg, 2026, 11, 11, {f["id"]: f["base"] for f in filas})
+assert tanda["numero"] == "2026/L11" and core.tanda_sugerida(2026) == 12
 
 # Correos: 2 a arrendatarios (el tercero no recibe) + 3 copias
 tanda, pend = core.correos_pendientes(cfg, 2026, 11)

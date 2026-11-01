@@ -233,8 +233,16 @@ def cargar_tanda(y, m):
 
 
 def tanda_sugerida(y):
-    estado = leer_json(RUTA_ESTADO, {"ultima_tanda": {}})
-    return estado["ultima_tanda"].get(str(y), 0) + 1
+    """Siguiente número: el mayor de las facturas que existen este año (o el inicial) más uno."""
+    estado = leer_json(RUTA_ESTADO, {})
+    base = int(estado.get("base_tanda", {}).get(str(y), 0))
+    existentes = []
+    if SALIDA.exists():
+        for ruta in SALIDA.glob(f"{y}-*/tanda.json"):
+            t = leer_json(ruta)
+            if t:
+                existentes.append(int(t["seq"]))
+    return max([base] + existentes) + 1
 
 
 def arrendatarios_activos(cfg):
@@ -286,9 +294,6 @@ def preparar_tanda(cfg, y, m, seq, importes):
         nuevas.append(inv)
     tanda["facturas"] = nuevas
     guardar_json(ruta_tanda, tanda)
-    estado = leer_json(RUTA_ESTADO, {"ultima_tanda": {}})
-    estado["ultima_tanda"][str(y)] = max(seq, estado["ultima_tanda"].get(str(y), 0))
-    guardar_json(RUTA_ESTADO, estado)
     return tanda
 
 
