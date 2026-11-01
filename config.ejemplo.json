@@ -1,0 +1,74 @@
+{
+  "cuenta_outlook": "",
+  "remitente_nombre": "Nombre",
+  "firma_correo": "Nombre",
+  "smtp_servidor": "smtp-mail.outlook.com",
+  "smtp_puerto": 587,
+  "iva": 21,
+  "irpf": 19,
+  "dia_emision": 1,
+  "emisor": {
+    "nombre": "Nombre Apellidos Ejemplo",
+    "firma": "D. Nombre Apellidos Ejemplo",
+    "dni": "00.000.000-X",
+    "direccion": "Calle Ejemplo, 1",
+    "telefono": "600 000 000",
+    "poblacion": "46000-VALENCIA"
+  },
+  "correo": {
+    "asunto": "Factura {numero} – Alquiler {mes} {anio}",
+    "mensaje": "Buenos días,\n\nAdjunto la factura {numero} correspondiente al alquiler de {mes} de {anio}.\n\nUn saludo,\n{emisor}"
+  },
+  "correo_copia": {
+    "para": "copia@example.com",
+    "asunto": "Copia factura {numero} – {arrendatario} – {mes} {anio}",
+    "mensaje": "Hola,\n\nTe envío copia de la factura {numero} de {arrendatario} correspondiente a {mes} de {anio}.\n\nUn saludo,\n{emisor}"
+  },
+  "arrendatarios": [
+    {
+      "id": "t1",
+      "nombre": "Arrendatario Uno",
+      "tipo_doc": "DNI",
+      "num_doc": "00000001-A",
+      "direccion": "Calle Uno, 1\n46000 Valencia (Valencia)",
+      "concepto": "ALQUILER LOCAL",
+      "referencias": "REF CATASTRAL: 0000000AA0000A0001AA",
+      "base": 3087,
+      "forma_pago": "Cuenta Bancaria: ES00 0000 0000 0000 0000 0000",
+      "lugar": "Valencia",
+      "correos": "uno@example.com",
+      "enviar_correo": true,
+      "activo": true
+    },
+    {
+      "id": "t2",
+      "nombre": "Arrendatario Dos S.L",
+      "tipo_doc": "CIF",
+      "num_doc": "B00000002",
+      "direccion": "Calle Dos, 2\n46000 Valencia (Valencia)",
+      "concepto": "ALQUILER NAVE",
+      "referencias": "NAVE REF CATASTRAL: 0000000AA0000A0001AA\nSOLAR REF CATASTRAL: 0000000AA0000A0002BB",
+      "base": 2500,
+      "forma_pago": "Según contrato",
+      "lugar": "Valencia",
+      "correos": "dos@example.com, dos.b@example.com",
+      "enviar_correo": true,
+      "activo": true
+    },
+    {
+      "id": "t3",
+      "nombre": "Arrendatario Tres",
+      "tipo_doc": "NIE",
+      "num_doc": "Y0000003-C",
+      "direccion": "Calle Tres, 3\n46000 Paterna (Valencia)",
+      "concepto": "",
+      "referencias": "",
+      "base": 675,
+      "forma_pago": "Según contrato",
+      "lugar": "Valencia",
+      "correos": "",
+      "enviar_correo": false,
+      "activo": true
+    }
+  ]
+}

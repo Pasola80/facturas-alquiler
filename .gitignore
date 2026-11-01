@@ -1,0 +1,9 @@
+# Datos personales: no se suben nunca al repositorio
+config.json
+estado.json
+facturas/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec

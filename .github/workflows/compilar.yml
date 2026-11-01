@@ -1,0 +1,47 @@
+name: Compilar programa para Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compilar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Comprobar la lógica
+        run: python tests.py
+
+      - name: Comprobar que la ventana se abre
+        env:
+          FACTURAS_SMOKE: "1"
+        run: python app.py
+
+      - name: Compilar el .exe
+        run: pyinstaller --noconfirm --onefile --windowed --name Facturas-de-alquiler --hidden-import keyring.backends.Windows --collect-submodules keyring app.py
+
+      - name: Guardar el .exe como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: Facturas-de-alquiler
+          path: dist/Facturas-de-alquiler.exe
+
+      - name: Publicar en Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete programa --yes --cleanup-tag || true
+          gh release create programa dist/Facturas-de-alquiler.exe --title "Programa para Windows" --notes "Programa de facturas de alquiler para Windows. Descarga Facturas-de-alquiler.exe y colócalo junto a tu config.json."
